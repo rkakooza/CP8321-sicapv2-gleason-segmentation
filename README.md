@@ -50,11 +50,19 @@ This project uses:
 Create a conda environment:
 
 ```
-conda create -n sicap python=3.10
-conda activate sicap
+# Create the environment from the file
+conda env create -f environment.yml
+
+# Activate the environment
+conda activate sicap-env
 ```
 
-Install dependencies (later we’ll add `environment.yml` or `requirements.txt`).
+If you prefer to create the environment manually instead of using environment.yml, run:
+
+```
+conda create -n sicap-env python=3.10
+conda activate sicap-env
+```
 
 ## Authors / Team
 
