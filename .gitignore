@@ -1,0 +1,28 @@
+# --------------------
+# Data (big files)
+# --------------------
+data/
+!data/.gitkeep
+
+# --------------------
+# Experiments (ignore model weights)
+# --------------------
+experiments/**/*.pth
+experiments/**/*.pt
+experiments/**/checkpoints/
+
+# --------------------
+# Python cache
+# --------------------
+__pycache__/
+*.pyc
+
+# --------------------
+# Jupyter notebook cache
+# --------------------
+.ipynb_checkpoints/
+
+# --------------------
+# OS-specific files
+# --------------------
+.DS_Store
