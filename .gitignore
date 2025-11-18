@@ -26,3 +26,5 @@ __pycache__/
 # OS-specific files
 # --------------------
 .DS_Store
+
+quick_check.ipynb
