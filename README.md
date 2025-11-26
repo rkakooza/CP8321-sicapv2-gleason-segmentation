@@ -47,6 +47,100 @@ This project uses:
 - Final training on the full training set
 - Evaluation on the held-out global Test set
 
+## Training via CLI (Single Run or Cross‑Validation)
+
+All training, whether a single fold or full 4‑fold cross‑validation is performed using the same command-line interface:
+
+```bash
+python -m src.run_training --fold <FOLD> --epochs 40 --batch_size 4 --num_workers 2
+```
+
+**Arguments:**
+
+- `--fold` — one of {Val1, Val2, Val3, Val4, final}
+- `--epochs` — number of epochs
+- `--batch_size` — mini‑batch size
+- `--lr` — learning rate (default: 1e‑4)
+- `--num_workers` — number of DataLoader workers (macOS users may need 0)
+- `--data_root` — dataset directory (default: data/SICAPv2)
+- `--out_dir` — output directory for experiment results (default: experiments/)
+
+The script automatically:
+
+- detects CUDA / MPS / CPU
+- loads the correct Excel partition for the selected fold
+- trains the Attention U‑Net
+- evaluates on the corresponding validation or test set
+- saves results to `experiments/<FOLD>/`
+
+Outputs include:
+
+- `best_model.pth`
+- `val_metrics.json` (or `test_metrics.json` for `--fold final`)
+
+---
+
+### Running All 4 Folds (Cross‑Validation)
+
+To run 4‑fold patient‑based cross‑validation, simply execute the training command once per fold:
+
+```bash
+python -m src.run_training --fold Val1 --epochs 40 --batch_size 4 --num_workers 2
+python -m src.run_training --fold Val2 --epochs 40 --batch_size 4 --num_workers 2
+python -m src.run_training --fold Val3 --epochs 40 --batch_size 4 --num_workers 2
+python -m src.run_training --fold Val4 --epochs 40 --batch_size 4 --num_workers 2
+```
+
+Each run will populate:
+
+```
+experiments/Val1/
+experiments/Val2/
+experiments/Val3/
+experiments/Val4/
+```
+
+We shall divide folds among ourselves.
+
+---
+
+### Training the Final Model
+
+After cross‑validation, we can train the final model on all available training data:
+
+```bash
+python -m src.run_training --fold final --epochs 40 --batch_size 4 --num_workers 2
+```
+
+This uses the global Test set for evaluation and produces:
+
+```
+experiments/final/
+    best_model.pth
+    test_metrics.json
+```
+
+## Device Compatibility
+
+The training pipeline automatically selects the best available compute device:
+
+- **NVIDIA GPU (CUDA)** — if available on Linux/Windows
+- **Apple Silicon GPU (M1/M2/M3 using MPS backend)** — for macOS users
+- **CPU fallback** — if no GPU is detected
+
+No manual configuration is required. The training script handles device detection internally:
+
+```python
+if torch.cuda.is_available():
+    device = torch.device("cuda")
+elif torch.backends.mps.is_available():
+    device = torch.device("mps")
+else:
+    device = torch.device("cpu")
+```
+
+This setup ensures anyone can train and run experiments regardless of hardware.
+
 ## Environment Setup
 
 Create a conda environment:
