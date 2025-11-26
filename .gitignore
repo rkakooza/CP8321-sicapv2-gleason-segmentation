@@ -28,4 +28,3 @@ __pycache__/
 .DS_Store
 
 notebooks/quick_check.ipynb
-src/dataset.py
