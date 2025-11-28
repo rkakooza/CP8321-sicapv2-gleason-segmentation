@@ -52,7 +52,7 @@ This project uses:
 All training, whether a single fold or full 4‑fold cross‑validation is performed using the same command-line interface:
 
 ```bash
-python -m src.run_training --fold <FOLD> --epochs 40 --batch_size 4 --num_workers 2
+python -m src.run_training --fold <FOLD> --epochs 40 --batch_size 4 --num_workers 0
 ```
 
 **Arguments:**
@@ -62,6 +62,9 @@ python -m src.run_training --fold <FOLD> --epochs 40 --batch_size 4 --num_worker
 - `--batch_size` — mini‑batch size
 - `--lr` — learning rate (default: 1e‑4)
 - `--num_workers` — number of DataLoader workers (macOS users may need 0)
+
+> **Note:** `num_workers=0` is the safest and most compatible setting across all platforms (Windows, macOS, Linux). Increase to `2–4` only if your system supports multi-process data loading without issues (Linux usually does; Windows often does not).
+
 - `--data_root` — dataset directory (default: data/SICAPv2)
 - `--out_dir` — output directory for experiment results (default: experiments/)
 
@@ -85,10 +88,10 @@ Outputs include:
 To run 4‑fold patient‑based cross‑validation, simply execute the training command once per fold:
 
 ```bash
-python -m src.run_training --fold Val1 --epochs 40 --batch_size 4 --num_workers 2
-python -m src.run_training --fold Val2 --epochs 40 --batch_size 4 --num_workers 2
-python -m src.run_training --fold Val3 --epochs 40 --batch_size 4 --num_workers 2
-python -m src.run_training --fold Val4 --epochs 40 --batch_size 4 --num_workers 2
+python -m src.run_training --fold Val1 --epochs 40 --batch_size 4 --num_workers 0
+python -m src.run_training --fold Val2 --epochs 40 --batch_size 4 --num_workers 0
+python -m src.run_training --fold Val3 --epochs 40 --batch_size 4 --num_workers 0
+python -m src.run_training --fold Val4 --epochs 40 --batch_size 4 --num_workers 0
 ```
 
 Each run will populate:
@@ -109,7 +112,7 @@ We shall divide folds among ourselves.
 After cross‑validation, we can train the final model on all available training data:
 
 ```bash
-python -m src.run_training --fold final --epochs 40 --batch_size 4 --num_workers 2
+python -m src.run_training --fold final --epochs 40 --batch_size 4 --num_workers 0
 ```
 
 This uses the global Test set for evaluation and produces:
