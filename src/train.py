@@ -37,9 +37,13 @@ def train_epoch(model, dataloader, optimizer, loss_fn, device, scaler, device_ty
             logits = model(images)
             loss = loss_fn(logits, masks)
 
-        scaler.scale(loss).backward()
-        scaler.step(optimizer)
-        scaler.update()
+        if scaler is not None:
+            scaler.scale(loss).backward()
+            scaler.step(optimizer)
+            scaler.update()
+        else:
+            loss.backward()
+            optimizer.step()
         optimizer.zero_grad()
 
         running_loss += loss.item()
@@ -80,29 +84,13 @@ def validate_epoch(model, dataloader, loss_fn, device, num_classes, device_type)
     return final_metrics
 
 
-def train(model, train_loader, val_loader, optimizer, loss_fn, device, num_classes, epochs=20):
+def train(model, train_loader, val_loader, optimizer, loss_fn, device, num_classes):
     device_type = device.type
-    scaler = amp.GradScaler(device_type=device_type)
-    history = {
-        "train_loss": [],
-        "val_loss": [],
-        "val_dice_macro": []
-    }
-    for epoch in range(1, epochs + 1):
-        print(f"\nEpoch {epoch}/{epochs}")
-
-        train_loss = train_epoch(model, train_loader, optimizer, loss_fn, device, scaler, device_type)
-        val_metrics = validate_epoch(model, val_loader, loss_fn, device, num_classes, device_type)
-
-        print(f"Train Loss: {train_loss:.4f}")
-        print(f"Val Dice (macro): {val_metrics['dice_macro']:.4f}")
-
-        # Log into history
-        history["train_loss"].append(train_loss)
-        history["val_loss"].append(val_metrics.get("loss", 0.0).item())
-        history["val_dice_macro"].append(val_metrics["dice_macro"].item())
-
-    return history
+    scaler = amp.GradScaler() if device_type == "cuda" else None
+    # perform one epoch
+    train_loss = train_epoch(model, train_loader, optimizer, loss_fn, device, scaler, device_type)
+    val_metrics = validate_epoch(model, val_loader, loss_fn, device, num_classes, device_type)
+    return train_loss, val_metrics.get("loss", torch.tensor(0.0)).item(), val_metrics["dice_macro"].item()
 
 
 if __name__ == "__main__":
