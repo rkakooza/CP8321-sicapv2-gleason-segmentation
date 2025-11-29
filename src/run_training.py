@@ -41,7 +41,7 @@ def parse_args():
 def main():
     args = parse_args()
 
-    # Create output directory for this fold
+    # Create output directory for a fold
     fold_dir = os.path.join(args.out_dir, args.fold)
     os.makedirs(fold_dir, exist_ok=True)
 
@@ -75,37 +75,49 @@ def main():
     # Optimizer
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 
-    # Train the model
-    history = train(model=model,
-                    train_loader=train_loader,
-                    val_loader=val_loader,
-                    optimizer=optimizer,
-                    loss_fn=loss_fn,
-                    device=device,
-                    num_classes=4,
-                    epochs=args.epochs)
+    # Setup best checkpoint tracking
+    best_dice = -1.0
+    best_epoch = -1
+    best_ckpt_path = os.path.join(fold_dir, "best_model.pth")
 
-    # Final validation pass for saving metrics
+    # Training loop with per-epoch validation
+    history = {"train_loss": [], "val_loss": [], "val_dice_macro": []}
+    for epoch in range(1, args.epochs+1):
+        train_loss, val_loss, val_dice = train(model=model,
+                                               train_loader=train_loader,
+                                               val_loader=val_loader,
+                                               optimizer=optimizer,
+                                               loss_fn=loss_fn,
+                                               device=device,
+                                               num_classes=4,
+                                               epochs=1,
+                                               return_last_only=True)
+        history["train_loss"].append(train_loss)
+        history["val_loss"].append(val_loss)
+        history["val_dice_macro"].append(val_dice)
+        if val_dice > best_dice:
+            best_dice = val_dice
+            best_epoch = epoch
+            torch.save(model.state_dict(), best_ckpt_path)
+            print(f"New best model at epoch {epoch} (dice_macro={val_dice:.4f}). Saved to {best_ckpt_path}")
+
+    # Load the best model and compute final validation metrics
+    model.load_state_dict(torch.load(best_ckpt_path))
     model.eval()
     all_metrics = []
-
     with torch.inference_mode():
         for images, masks in val_loader:
             images = images.to(device)
             masks = masks.to(device)
-
             logits = model(images)
             preds = torch.argmax(logits, dim=1)
-
             m = aggregate_metrics(preds.cpu(), masks.cpu(), num_classes=4)
             all_metrics.append(m)
-
-    # Average metrics across validation samples
+    # average
     final_metrics = {}
     for key in all_metrics[0].keys():
         vals = [m[key] for m in all_metrics]
-        final_metrics[key] = (torch.stack(vals).mean().item()
-                              if torch.is_tensor(vals[0]) else sum(vals) / len(vals))
+        final_metrics[key] = torch.stack([v if torch.is_tensor(v) else torch.tensor(v) for v in vals]).mean().item()
 
     # Save metrics JSON
     metrics_path = os.path.join(fold_dir, "val_metrics.json")
