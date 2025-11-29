@@ -83,15 +83,16 @@ def main():
     # Training loop with per-epoch validation
     history = {"train_loss": [], "val_loss": [], "val_dice_macro": []}
     for epoch in range(1, args.epochs+1):
-        train_loss, val_loss, val_dice = train(model=model,
-                                               train_loader=train_loader,
-                                               val_loader=val_loader,
-                                               optimizer=optimizer,
-                                               loss_fn=loss_fn,
-                                               device=device,
-                                               num_classes=4,
-                                               epochs=1,
-                                               return_last_only=True)
+        print(f"\nEpoch {epoch}/{args.epochs}")
+        train_loss, val_loss, val_dice = train(
+            model=model,
+            train_loader=train_loader,
+            val_loader=val_loader,
+            optimizer=optimizer,
+            loss_fn=loss_fn,
+            device=device,
+            num_classes=4
+        )
         history["train_loss"].append(train_loss)
         history["val_loss"].append(val_loss)
         history["val_dice_macro"].append(val_dice)
