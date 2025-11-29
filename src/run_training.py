@@ -9,7 +9,6 @@ from .attention_unet import AttentionUNet
 from .losses import CombinedLoss
 from .metrics import aggregate_metrics
 from .train import train, get_device
-from torch.cuda.amp import GradScaler
 
 
 def parse_args():
@@ -36,9 +35,6 @@ def parse_args():
     parser.add_argument("--out_dir", type=str, default="experiments",
                         help="Where to save results")
 
-    parser.add_argument("--resume", action="store_true",
-                        help="Resume training from checkpoint if available")
-
     return parser.parse_args()
 
 
@@ -48,8 +44,6 @@ def main():
     # Create output directory for this fold
     fold_dir = os.path.join(args.out_dir, args.fold)
     os.makedirs(fold_dir, exist_ok=True)
-
-    checkpoint_path = os.path.join(fold_dir, "best_model.pth")
 
     # Excel partition paths
     if args.fold.lower() == "final":
@@ -72,13 +66,6 @@ def main():
 
     device = get_device()
 
-    use_amp = False
-    scaler = None
-
-    if device.type == "cuda":
-        use_amp = True
-        scaler = GradScaler()
-
     # Model
     model = AttentionUNet(in_channels=3, num_classes=4).to(device)
 
@@ -96,47 +83,39 @@ def main():
                     loss_fn=loss_fn,
                     device=device,
                     num_classes=4,
-                    epochs=args.epochs,
-                    use_amp=use_amp,
-                    scaler=scaler,
-                    checkpoint_path=checkpoint_path,
-                    resume=args.resume)
+                    epochs=args.epochs)
 
-    # Load best checkpoint for final metrics
-    if os.path.exists(checkpoint_path):
-        ckpt = torch.load(checkpoint_path, map_location=device)
-        model.load_state_dict(ckpt["model_state"])
-        history = ckpt["history"]
-
+    # Final validation pass for saving metrics
     model.eval()
     all_metrics = []
+
     with torch.inference_mode():
         for images, masks in val_loader:
             images = images.to(device)
             masks = masks.to(device)
+
             logits = model(images)
             preds = torch.argmax(logits, dim=1)
+
             m = aggregate_metrics(preds.cpu(), masks.cpu(), num_classes=4)
             all_metrics.append(m)
 
+    # Average metrics across validation samples
     final_metrics = {}
     for key in all_metrics[0].keys():
         vals = [m[key] for m in all_metrics]
         final_metrics[key] = (torch.stack(vals).mean().item()
-                              if torch.is_tensor(vals[0])
-                              else sum(vals) / len(vals))
+                              if torch.is_tensor(vals[0]) else sum(vals) / len(vals))
 
-    # Save metrics
+    # Save metrics JSON
     metrics_path = os.path.join(fold_dir, "val_metrics.json")
     with open(metrics_path, "w") as f:
         json.dump(final_metrics, f, indent=4)
 
-    # Save history
-    history_path = os.path.join(fold_dir, "history.json")
-    with open(history_path, "w") as f:
-        json.dump(history, f, indent=4)
-
-    print(f"Saved metrics to {metrics_path}")
+    history_path = os.path.join(fold_dir,"history.json")
+    with open(history_path,"w") as f:
+        json.dump(history,f,indent=4)
+    print(f"\nSaved metrics to {metrics_path}")
     print(f"Saved training history to {history_path}")
 
 
