@@ -88,10 +88,10 @@ Outputs include:
 To run 4‑fold patient‑based cross‑validation, simply execute the training command once per fold:
 
 ```bash
-python -m src.run_training --fold Val1 --epochs 40 --batch_size 4 --num_workers 0
-python -m src.run_training --fold Val2 --epochs 40 --batch_size 4 --num_workers 0
-python -m src.run_training --fold Val3 --epochs 40 --batch_size 4 --num_workers 0
-python -m src.run_training --fold Val4 --epochs 40 --batch_size 4 --num_workers 0
+python -m src.run_training --fold Val1 --epochs 8 --batch_size 4 --num_workers 0
+python -m src.run_training --fold Val2 --epochs 8 --batch_size 4 --num_workers 0
+python -m src.run_training --fold Val3 --epochs 8 --batch_size 4 --num_workers 0
+python -m src.run_training --fold Val4 --epochs 8 --batch_size 4 --num_workers 0
 ```
 
 Each run will populate:
