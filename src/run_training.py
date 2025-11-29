@@ -96,6 +96,8 @@ def main():
         history["train_loss"].append(train_loss)
         history["val_loss"].append(val_loss)
         history["val_dice_macro"].append(val_dice)
+        print(f"Train Loss: {train_loss:.4f}")
+        print(f"Val Dice (macro): {val_dice:.4f}")
         if val_dice > best_dice:
             best_dice = val_dice
             best_epoch = epoch

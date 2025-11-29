@@ -7,9 +7,8 @@ data/
 # --------------------
 # Experiments (ignore model weights)
 # --------------------
-experiments/**/*.pth
-experiments/**/*.pt
-experiments/**/checkpoints/
+experiments/
+!experiments/.gitkeep
 
 # --------------------
 # Python cache
