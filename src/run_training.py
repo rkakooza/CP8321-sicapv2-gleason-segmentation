@@ -26,7 +26,7 @@ def parse_args():
     parser.add_argument("--lr", type=float, default=1e-4,
                         help="Learning rate")
 
-    parser.add_argument("--num_workers", type=int, default=2,
+    parser.add_argument("--num_workers", type=int, default=0,
                         help="Number of DataLoader workers")
 
     parser.add_argument("--data_root", type=str, default="data/SICAPv2",

@@ -1,6 +1,7 @@
 import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
+from torch import amp
 
 from .attention_unet import AttentionUNet
 from .losses import CombinedLoss
@@ -22,7 +23,7 @@ def get_device():
         return torch.device("cpu")
 
 
-def train_epoch(model, dataloader, optimizer, loss_fn, device):
+def train_epoch(model, dataloader, optimizer, loss_fn, device, scaler, device_type):
     model.train()
     running_loss = 0.0
 
@@ -32,11 +33,14 @@ def train_epoch(model, dataloader, optimizer, loss_fn, device):
         images = images.to(device)
         masks = masks.to(device)
 
+        with amp.autocast(device_type=device_type):
+            logits = model(images)
+            loss = loss_fn(logits, masks)
+
+        scaler.scale(loss).backward()
+        scaler.step(optimizer)
+        scaler.update()
         optimizer.zero_grad()
-        logits = model(images)
-        loss = loss_fn(logits, masks)
-        loss.backward()
-        optimizer.step()
 
         running_loss += loss.item()
         pbar.set_postfix({"loss": loss.item()})
@@ -44,7 +48,7 @@ def train_epoch(model, dataloader, optimizer, loss_fn, device):
     return running_loss / len(dataloader)
 
 
-def validate_epoch(model, dataloader, loss_fn, device, num_classes):
+def validate_epoch(model, dataloader, loss_fn, device, num_classes, device_type):
     model.eval()
     all_metrics = []
 
@@ -55,8 +59,9 @@ def validate_epoch(model, dataloader, loss_fn, device, num_classes):
             images = images.to(device)
             masks = masks.to(device)
 
-            logits = model(images)
-            loss = loss_fn(logits, masks)
+            with amp.autocast(device_type=device_type):
+                logits = model(images)
+                loss = loss_fn(logits, masks)
             preds = torch.argmax(logits, dim=1)
 
             batch_metrics = aggregate_metrics(preds.cpu(), masks.cpu(), num_classes)
@@ -76,6 +81,8 @@ def validate_epoch(model, dataloader, loss_fn, device, num_classes):
 
 
 def train(model, train_loader, val_loader, optimizer, loss_fn, device, num_classes, epochs=20):
+    device_type = device.type
+    scaler = amp.GradScaler(device_type=device_type)
     history = {
         "train_loss": [],
         "val_loss": [],
@@ -84,8 +91,8 @@ def train(model, train_loader, val_loader, optimizer, loss_fn, device, num_class
     for epoch in range(1, epochs + 1):
         print(f"\nEpoch {epoch}/{epochs}")
 
-        train_loss = train_epoch(model, train_loader, optimizer, loss_fn, device)
-        val_metrics = validate_epoch(model, val_loader, loss_fn, device, num_classes)
+        train_loss = train_epoch(model, train_loader, optimizer, loss_fn, device, scaler, device_type)
+        val_metrics = validate_epoch(model, val_loader, loss_fn, device, num_classes, device_type)
 
         print(f"Train Loss: {train_loss:.4f}")
         print(f"Val Dice (macro): {val_metrics['dice_macro']:.4f}")
