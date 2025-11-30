@@ -5,10 +5,10 @@ data/
 !data/.gitkeep
 
 # --------------------
-# Experiments (ignore model weights)
+# Experiments (big files)
 # --------------------
-# experiments/
-# !experiments/.gitkeep
+experiments/
+!experiments/.gitkeep
 
 # --------------------
 # Python cache
