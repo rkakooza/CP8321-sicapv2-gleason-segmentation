@@ -3,12 +3,31 @@ import os
 import json
 import torch
 from torch.utils.data import DataLoader
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 from .dataset import build_dataset_from_partition
 from .attention_unet import AttentionUNet
 from .losses import CombinedLoss
 from .metrics import aggregate_metrics
 from .train import train, get_device
+from .transforms import get_train_transform, get_val_transform
+
+
+class EarlyStopping:
+    def __init__(self, patience=5, min_delta=0.0005):
+        self.patience = patience
+        self.min_delta = min_delta
+        self.counter = 0
+        self.best = None
+
+    def step(self, val_loss):
+        if self.best is None or val_loss < self.best - self.min_delta:
+            self.best = val_loss
+            self.counter = 0
+            return False
+        else:
+            self.counter += 1
+            return self.counter >= self.patience
 
 
 def parse_args():
@@ -54,8 +73,11 @@ def main():
         val_xlsx   = os.path.join(args.data_root,"partition","Validation",args.fold,"Test.xlsx")
 
     # Build datasets
-    train_ds = build_dataset_from_partition(train_xlsx, args.data_root)
-    val_ds = build_dataset_from_partition(val_xlsx, args.data_root)
+    train_transform = get_train_transform()
+    val_transform = get_val_transform()
+
+    train_ds = build_dataset_from_partition(train_xlsx, args.data_root, transform=train_transform)
+    val_ds = build_dataset_from_partition(val_xlsx, args.data_root, transform=val_transform)
 
     # Dataloaders
     train_loader = DataLoader(train_ds, batch_size=args.batch_size,
@@ -75,6 +97,9 @@ def main():
     # Optimizer
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 
+    scheduler = ReduceLROnPlateau(optimizer, mode="min", patience=3, factor=0.5)
+    early_stopper = EarlyStopping(patience=5)
+
     # Setup best checkpoint tracking
     best_dice = -1.0
     best_epoch = -1
@@ -84,14 +109,16 @@ def main():
     history = {"train_loss": [], "val_loss": [], "val_dice_macro": []}
     for epoch in range(1, args.epochs+1):
         print(f"\nEpoch {epoch}/{args.epochs}")
-        train_loss, val_loss, val_dice = train(
+        train_loss, val_loss, val_dice, stop_flag = train(
             model=model,
             train_loader=train_loader,
             val_loader=val_loader,
             optimizer=optimizer,
             loss_fn=loss_fn,
             device=device,
-            num_classes=4
+            num_classes=4,
+            scheduler=scheduler,
+            early_stopper=early_stopper
         )
         history["train_loss"].append(train_loss)
         history["val_loss"].append(val_loss)
@@ -103,6 +130,9 @@ def main():
             best_epoch = epoch
             torch.save(model.state_dict(), best_ckpt_path)
             print(f"New best model at epoch {epoch} (dice_macro={val_dice:.4f}). Saved to {best_ckpt_path}")
+        if stop_flag:
+            print("Early stopping triggered.")
+            break
 
     # Load the best model and compute final validation metrics
     model.load_state_dict(torch.load(best_ckpt_path))

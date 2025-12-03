@@ -84,13 +84,32 @@ def validate_epoch(model, dataloader, loss_fn, device, num_classes, device_type)
     return final_metrics
 
 
-def train(model, train_loader, val_loader, optimizer, loss_fn, device, num_classes):
+def train(model, train_loader, val_loader, optimizer, loss_fn, device, num_classes,
+          scheduler=None, early_stopper=None):
     device_type = device.type
     scaler = amp.GradScaler() if device_type == "cuda" else None
-    # perform one epoch
+
+    # run training
     train_loss = train_epoch(model, train_loader, optimizer, loss_fn, device, scaler, device_type)
+
+    # validation
     val_metrics = validate_epoch(model, val_loader, loss_fn, device, num_classes, device_type)
-    return train_loss, val_metrics.get("loss", torch.tensor(0.0)).item(), val_metrics["dice_macro"].item()
+    val_loss = val_metrics.get("loss", torch.tensor(0.0)).item()
+    dice_macro = val_metrics["dice_macro"].item()
+
+    # LR scheduling (ReduceLROnPlateau)
+    if scheduler is not None:
+        try:
+            scheduler.step(val_loss)
+        except TypeError:
+            scheduler.step()
+
+    # Early stopping
+    stop_flag = False
+    if early_stopper is not None:
+        stop_flag = early_stopper.step(val_loss)
+
+    return train_loss, val_loss, dice_macro, stop_flag
 
 
 if __name__ == "__main__":

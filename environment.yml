@@ -16,5 +16,6 @@ dependencies:
   - tqdm
   - openpyxl
   - pillow
-  - albumentations
+  - albumentations==1.4.6
+  - opencv-python-headless
   - pyyaml

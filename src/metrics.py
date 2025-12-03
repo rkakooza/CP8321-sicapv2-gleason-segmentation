@@ -58,14 +58,25 @@ def aggregate_metrics(preds, targets, num_classes):
     ious = iou_per_class(preds, targets, num_classes)
     precision, recall, f1 = precision_recall_f1(preds, targets, num_classes)
 
+    # Convert to lists for JSON compatibility
+    dices_list = dices.detach().cpu().tolist()
+    ious_list = ious.detach().cpu().tolist()
+    precision_list = precision.detach().cpu().tolist()
+    recall_list = recall.detach().cpu().tolist()
+    f1_list = f1.detach().cpu().tolist()
+
     return {
-        'pixel_accuracy': pixel_accuracy(preds, targets),
-        'dice_per_class': dices,
-        'dice_macro': dices.mean(),
-        'iou_per_class': ious,
-        'iou_macro': ious.mean(),
-        'precision': precision,
-        'recall': recall,
-        'f1': f1,
-        'f1_macro': f1.mean(),
+        'pixel_accuracy': pixel_accuracy(preds, targets).detach().cpu().item(),
+        
+        'dice_per_class': dices_list,
+        'dice_macro': float(dices.mean().detach().cpu()),
+
+        'iou_per_class': ious_list,
+        'iou_macro': float(ious.mean().detach().cpu()),
+
+        'precision': precision_list,
+        'recall': recall_list,
+        'f1': f1_list,
+
+        'f1_macro': float(f1.mean().detach().cpu()),
     }

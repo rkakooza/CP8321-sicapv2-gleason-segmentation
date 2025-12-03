@@ -1,4 +1,3 @@
-
 import os
 import torch
 from torch.utils.data import Dataset
@@ -44,7 +43,7 @@ class SICAPv2Dataset(Dataset):
         """
         image_paths: list of full paths to image files
         mask_paths: list of full paths to mask files
-        transform: Augmentation pipeline (for later if needed)
+        transform: Augmentations for better generalization
         """
         self.image_paths = image_paths
         self.mask_paths = mask_paths
@@ -68,12 +67,17 @@ class SICAPv2Dataset(Dataset):
         # Map all unexpected mask values (>3) to 0
         mask[mask > 3] = 0
 
-        # Apply transform later (if we decide to implement it)
+        # Albumentations transforms here
         if self.transform:
-            # transform expects combined dict or custom pipeline
-            raise NotImplementedError("Transforms not implemented yet")
+            augmented = self.transform(image=image, mask=mask)
+            image = augmented["image"]
+            mask = augmented["mask"]
 
-        image = torch.from_numpy(image).permute(2, 0, 1)
-        mask = torch.from_numpy(mask)
+        # If using ToTensorV2(), image and mask are already torch tensors.
+        # If not, we convert manually(This is a fallback to avoid errors).
+        if not isinstance(image, torch.Tensor):
+            image = torch.from_numpy(image).permute(2, 0, 1)
+        if not isinstance(mask, torch.Tensor):
+            mask = torch.from_numpy(mask)
 
         return image, mask
