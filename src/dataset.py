@@ -78,6 +78,8 @@ class SICAPv2Dataset(Dataset):
         if not isinstance(image, torch.Tensor):
             image = torch.from_numpy(image).permute(2, 0, 1)
         if not isinstance(mask, torch.Tensor):
-            mask = torch.from_numpy(mask)
+            mask = torch.from_numpy(mask).long()
+
+        mask = mask.long()
 
         return image, mask
