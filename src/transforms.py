@@ -14,7 +14,7 @@ def get_train_transform():
         A.OneOf([
             A.GaussianBlur(blur_limit=(0, 3), p=1.0),  
             A.MedianBlur(blur_limit=3, p=1.0),        
-            A.GaussNoise(var_limit=(0.05, 0.05), p=1.0), 
+            A.GaussNoise(mean=0, std=0.05, p=1.0), 
             A.ColorJitter(
                 brightness=(229/255, 281/255),
                 contrast=(0.95, 1.1),
