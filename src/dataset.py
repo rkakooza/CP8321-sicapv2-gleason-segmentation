@@ -73,13 +73,13 @@ class SICAPv2Dataset(Dataset):
             image = augmented["image"]
             mask = augmented["mask"]
 
-        # If using ToTensorV2(), image and mask are already torch tensors.
+        # Using ToTensorV2(), image and mask are already torch tensors.
         # If not, we convert manually(This is a fallback to avoid errors).
         if not isinstance(image, torch.Tensor):
             image = torch.from_numpy(image).permute(2, 0, 1)
         if not isinstance(mask, torch.Tensor):
             mask = torch.from_numpy(mask).long()
 
-        mask = mask.long()
+        mask = mask.long() # Added this to force it or we get error
 
         return image, mask
