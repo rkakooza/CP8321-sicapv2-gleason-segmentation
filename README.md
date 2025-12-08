@@ -79,7 +79,7 @@ The script automatically:
 Outputs include:
 
 - `best_model.pth`
-- `val_metrics.json` (or `test_metrics.json` for `--fold final`)
+- `val_metrics.json`
 
 ---
 

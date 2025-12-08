@@ -1,52 +1,47 @@
 import os
+import cv2
 import torch
-from torch.utils.data import Dataset
-from PIL import Image
-import pandas as pd
 import numpy as np
+import pandas as pd
+from torch.utils.data import Dataset
 
 
-# Utility functions for partition handling
-def load_partition_excel(excel_path):
+def get_patch_label(row):
+    if row.get("NC", 0) == 1:
+        return 0
+    if row.get("G3", 0) == 1:
+        return 1
+    if row.get("G4", 0) == 1 or row.get("G4C", 0) == 1:
+        return 2
+    if row.get("G5", 0) == 1:
+        return 3
+    raise ValueError("Invalid Gleason label row: NC/G3/G4/G4C/G5 are all zero.")
+
+
+def load_partition(excel_path, images_root, masks_root):
     df = pd.read_excel(excel_path)
-    # assume first column contains patch names
-    col = df.columns[0]
-    names = df[col].astype(str).tolist()
 
-    # ensure .jpg extension
-    filenames = []
-    for n in names:
-        if not n.endswith(".jpg"):
-            filenames.append(n + ".jpg")
-        else:
-            filenames.append(n)
-    return filenames
+    image_paths = []
+    mask_paths = []
+    labels = []
 
+    for _, row in df.iterrows():
+        name = str(row["image_name"])
+        if not name.endswith(".jpg"):
+            name = name + ".jpg"
 
-def match_paths(filenames, images_root, masks_root):
-    image_paths = [os.path.join(images_root, f) for f in filenames]
-    mask_paths = [os.path.join(masks_root, f) for f in filenames]
-    return image_paths, mask_paths
+        image_paths.append(os.path.join(images_root, name))
+        mask_paths.append(os.path.join(masks_root, name))
+        labels.append(get_patch_label(row))
 
+    return image_paths, mask_paths, labels
 
-def build_dataset_from_partition(excel_path, sicap_root, transform=None):
-    filenames = load_partition_excel(excel_path)
-    images_root = os.path.join(sicap_root, "images")
-    masks_root = os.path.join(sicap_root, "masks")
-
-    image_paths, mask_paths = match_paths(filenames, images_root, masks_root)
-
-    return SICAPv2Dataset(image_paths, mask_paths, transform)
 
 class SICAPv2Dataset(Dataset):
-    def __init__(self, image_paths, mask_paths, transform=None):
-        """
-        image_paths: list of full paths to image files
-        mask_paths: list of full paths to mask files
-        transform: Augmentations for better generalization
-        """
+    def __init__(self, image_paths, mask_paths, labels, transform=None):
         self.image_paths = image_paths
         self.mask_paths = mask_paths
+        self.labels = labels
         self.transform = transform
 
     def __len__(self):
@@ -54,32 +49,38 @@ class SICAPv2Dataset(Dataset):
 
     def __getitem__(self, idx):
         # Load image
-        image_path = self.image_paths[idx]
-        mask_path = self.mask_paths[idx]
+        image = cv2.imread(self.image_paths[idx], cv2.IMREAD_COLOR)
+        if image is None:
+            raise FileNotFoundError(f"Image not found: {self.image_paths[idx]}")
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        image = image.astype(np.float32) / 255.0
+        
+        # Load mask
+        mask_raw = cv2.imread(self.mask_paths[idx], cv2.IMREAD_GRAYSCALE)
+        if mask_raw is None:
+            raise FileNotFoundError(f"Mask not found: {self.mask_paths[idx]}")
+        mask_raw = mask_raw.astype(np.uint8)
 
-        image = Image.open(image_path).convert("RGB")
-        mask = Image.open(mask_path).convert("L")
+        mask_binary = (mask_raw > 50).astype(np.uint8)
 
-        # To numpy arrays
-        image = np.array(image, dtype=np.float32) / 255.0
-        mask = np.array(mask, dtype=np.int64)
+        # Patch-level Gleason label (0–3)
+        patch_label = self.labels[idx] if self.labels is not None else 0
 
-        # Map all unexpected mask values (>3) to 0
-        mask[mask > 3] = 0
+        # Convert binary mask to multi-class: background=0, tissue=patch_label
+        mask_class = mask_binary * patch_label
+     
 
-        # Albumentations transforms here
-        if self.transform:
-            augmented = self.transform(image=image, mask=mask)
-            image = augmented["image"]
-            mask = augmented["mask"]
 
-        # Using ToTensorV2(), image and mask are already torch tensors.
-        # If not, we convert manually(This is a fallback to avoid errors).
+        # Augments
+        if self.transform is not None:
+            transformed = self.transform(image=image, mask=mask_class)
+            image = transformed["image"]
+            mask_class = transformed["mask"]
+
         if not isinstance(image, torch.Tensor):
-            image = torch.from_numpy(image).permute(2, 0, 1)
-        if not isinstance(mask, torch.Tensor):
-            mask = torch.from_numpy(mask).long()
+            image = torch.from_numpy(image).permute(2, 0, 1).float()
 
-        mask = mask.long() # Added this to force it or we get error
+        if not isinstance(mask_class, torch.Tensor):
+            mask_class = torch.from_numpy(mask_class).long()
 
-        return image, mask
+        return image, mask_class.long()

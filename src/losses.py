@@ -21,14 +21,20 @@ def dice_loss(logits, targets, num_classes, smooth=1e-5):
 
 #Combined CrossEntropy + Dice loss.
 class CombinedLoss(nn.Module):
-    def __init__(self, num_classes, ce_weight=1.0, dice_weight=1.0):
+    def __init__(self, num_classes, class_weights=None, ce_weight=1.0, dice_weight=1.0):
         super().__init__()
         self.num_classes = num_classes
-        self.ce = nn.CrossEntropyLoss()
-        self.ce_weight = ce_weight
-        self.dice_weight = dice_weight
+        self.ce_scale = ce_weight
+        self.dice_scale = dice_weight
+
+        if class_weights is not None:
+            w = torch.tensor(class_weights, dtype=torch.float32)
+            self.register_buffer("class_weights", w)
+            self.ce = nn.CrossEntropyLoss(weight=self.class_weights)
+        else:
+            self.ce = nn.CrossEntropyLoss()
 
     def forward(self, logits, targets):
         ce_loss = self.ce(logits, targets)
         d_loss = dice_loss(logits, targets, self.num_classes)
-        return self.ce_weight * ce_loss + self.dice_weight * d_loss
+        return self.ce_scale * ce_loss + self.dice_scale * d_loss

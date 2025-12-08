@@ -48,6 +48,7 @@ class AttentionGate(nn.Module):
         # psi(ψ): produces attention coefficients 
         self.psi = nn.Sequential(
             nn.Conv2d(inter_channels, 1, kernel_size=1, stride=1, padding=0, bias=True),
+            nn.BatchNorm2d(1),
             nn.Sigmoid()
         )
 
@@ -73,7 +74,7 @@ class UpBlock(nn.Module):
         self.upsample = nn.Upsample(scale_factor=2, mode="bilinear", align_corners=True)
         self.conv1x1 = nn.Conv2d(in_channels, out_channels, kernel_size=1, bias=False)
 
-        inter_channels = out_channels // 2
+        inter_channels = in_channels_skip
         self.attention = AttentionGate(
             in_channels_x=in_channels_skip,
             in_channels_g=out_channels,

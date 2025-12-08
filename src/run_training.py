@@ -5,7 +5,9 @@ import torch
 from torch.utils.data import DataLoader
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
-from .dataset import build_dataset_from_partition
+from PIL import Image
+
+from .dataset import load_partition, SICAPv2Dataset
 from .attention_unet import AttentionUNet
 from .losses import CombinedLoss
 from .metrics import aggregate_metrics
@@ -39,7 +41,7 @@ def parse_args():
     parser.add_argument("--epochs", type=int, default=40,
                         help="Number of training epochs")
 
-    parser.add_argument("--batch_size", type=int, default=4,
+    parser.add_argument("--batch_size", type=int, default=8,
                         help="Batch size for training")
 
     parser.add_argument("--lr", type=float, default=1e-4,
@@ -72,12 +74,22 @@ def main():
         train_xlsx = os.path.join(args.data_root,"partition","Validation",args.fold,"Train.xlsx")
         val_xlsx   = os.path.join(args.data_root,"partition","Validation",args.fold,"Test.xlsx")
 
+    images_root = os.path.join(args.data_root, "images")
+    masks_root = os.path.join(args.data_root, "masks")
+
+    # Load partitions
+    train_list = load_partition(train_xlsx, images_root=images_root, masks_root=masks_root)
+    val_list = load_partition(val_xlsx, images_root=images_root, masks_root=masks_root)
+
     # Build datasets
     train_transform = get_train_transform()
     val_transform = get_val_transform()
 
-    train_ds = build_dataset_from_partition(train_xlsx, args.data_root, transform=train_transform)
-    val_ds = build_dataset_from_partition(val_xlsx, args.data_root, transform=val_transform)
+    train_imgs, train_masks, train_labels = train_list
+    val_imgs, val_masks, val_labels = val_list
+
+    train_ds = SICAPv2Dataset(train_imgs, train_masks, train_labels, transform=train_transform)
+    val_ds = SICAPv2Dataset(val_imgs, val_masks, val_labels, transform=val_transform)
 
     # Dataloaders
     train_loader = DataLoader(train_ds, batch_size=args.batch_size,
@@ -92,7 +104,7 @@ def main():
     model = AttentionUNet(in_channels=3, num_classes=4).to(device)
 
     # Loss function
-    loss_fn = CombinedLoss(num_classes=4)
+    loss_fn = torch.nn.CrossEntropyLoss()
 
     # Optimizer
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
@@ -100,7 +112,7 @@ def main():
     scheduler = ReduceLROnPlateau(optimizer, mode="min", patience=3, factor=0.5)
     early_stopper = EarlyStopping(patience=5)
 
-    # Setup best checkpoint tracking
+    # Best checkpoint tracking
     best_dice = -1.0
     best_epoch = -1
     best_ckpt_path = os.path.join(fold_dir, "best_model.pth")
@@ -146,11 +158,22 @@ def main():
             preds = torch.argmax(logits, dim=1)
             m = aggregate_metrics(preds.cpu(), masks.cpu(), num_classes=4)
             all_metrics.append(m)
-    # average
+
     final_metrics = {}
-    for key in all_metrics[0].keys():
+    first = all_metrics[0]
+
+    for key, first_val in first.items():
         vals = [m[key] for m in all_metrics]
-        final_metrics[key] = torch.stack([v if torch.is_tensor(v) else torch.tensor(v) for v in vals]).mean().item()
+
+        # Per-class metrics are lists ([c0, c1, c2, c3])
+        if isinstance(first_val, (list, tuple)):
+            t = torch.tensor(vals, dtype=torch.float32)   
+            final_metrics[key] = t.mean(dim=0).tolist()  
+
+        # Scalar metrics (pixel_accuracy, dice_macro, iou_macro, f1_macro)
+        else:
+            t = torch.tensor(vals, dtype=torch.float32)   # shape: [N]
+            final_metrics[key] = t.mean().item()          # single scalar
 
     # Save metrics JSON
     metrics_path = os.path.join(fold_dir, "val_metrics.json")

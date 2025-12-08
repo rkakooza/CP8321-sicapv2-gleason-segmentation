@@ -30,7 +30,7 @@ def iou_per_class(preds, targets, num_classes, smooth=1e-5):
     iou = (intersection + smooth) / (union + smooth)
     return iou
 
-# this can be misleading for imbalanced data. we'll decide to keep or leave
+
 def pixel_accuracy(preds, targets):
     correct = (preds == targets).float()
     return correct.mean()
