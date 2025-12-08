@@ -2,39 +2,45 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-def dice_coefficient(logits, targets, num_classes, smooth=1e-5):
-    probs = F.softmax(logits, dim=1)  # (B, C, H, W)
-    targets_one_hot = F.one_hot(targets, num_classes=num_classes)  # (B, H, W, C)
-    targets_one_hot = targets_one_hot.permute(0, 3, 1, 2).float()  # (B, C, H, W)
 
-    dims = (0, 2, 3) 
-    intersection = torch.sum(probs * targets_one_hot, dims)
-    cardinality = torch.sum(probs + targets_one_hot, dims)
-
-    dice_per_class = (2. * intersection + smooth) / (cardinality + smooth)
-    return dice_per_class.mean()
-
-
-def dice_loss(logits, targets, num_classes, smooth=1e-5):
-    dice = dice_coefficient(logits, targets, num_classes, smooth)
-    return 1.0 - dice
-
-#Combined CrossEntropy + Dice loss.
-class CombinedLoss(nn.Module):
-    def __init__(self, num_classes, class_weights=None, ce_weight=1.0, dice_weight=1.0):
+class DiceLoss(nn.Module):
+    def __init__(self, num_classes, smooth=1e-5):
         super().__init__()
         self.num_classes = num_classes
-        self.ce_scale = ce_weight
-        self.dice_scale = dice_weight
+        self.smooth = smooth
 
-        if class_weights is not None:
-            w = torch.tensor(class_weights, dtype=torch.float32)
-            self.register_buffer("class_weights", w)
-            self.ce = nn.CrossEntropyLoss(weight=self.class_weights)
-        else:
-            self.ce = nn.CrossEntropyLoss()
+    def forward(self, preds, targets):
+        """
+        preds: (B, C, H, W) logits from network
+        targets: (B, H, W) integer class labels
+        """
+        preds = F.softmax(preds, dim=1)
+        targets_one_hot = F.one_hot(targets, num_classes=self.num_classes)
+        targets_one_hot = targets_one_hot.permute(0, 3, 1, 2).float()
 
-    def forward(self, logits, targets):
-        ce_loss = self.ce(logits, targets)
-        d_loss = dice_loss(logits, targets, self.num_classes)
-        return self.ce_scale * ce_loss + self.dice_scale * d_loss
+        dims = (0, 2, 3)
+
+        intersection = torch.sum(preds * targets_one_hot, dims)
+        union = torch.sum(preds + targets_one_hot, dims)
+
+        dice = (2.0 * intersection + self.smooth) / (union + self.smooth)
+
+        # Dice loss is (1 - dice) averaged across classes
+        return 1 - dice.mean()
+
+
+class CombinedLoss(nn.Module):
+    def __init__(self, num_classes, class_weights=None, dice_weight=0.5, ce_weight=0.5):
+        super().__init__()
+
+        self.dice = DiceLoss(num_classes=num_classes)
+        self.ce = nn.CrossEntropyLoss(weight=class_weights)
+
+        self.dice_weight = dice_weight
+        self.ce_weight = ce_weight
+
+    def forward(self, preds, targets):
+        ce = self.ce(preds, targets)
+        dice = self.dice(preds, targets)
+
+        return self.ce_weight * ce + self.dice_weight * dice

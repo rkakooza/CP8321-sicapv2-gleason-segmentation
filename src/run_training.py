@@ -104,7 +104,8 @@ def main():
     model = AttentionUNet(in_channels=3, num_classes=4).to(device)
 
     # Loss function
-    loss_fn = torch.nn.CrossEntropyLoss()
+    loss_fn = torch.nn.CrossEntropyLoss() # Another option i tried, produced good Values
+    # loss_fn = CombinedLoss(num_classes=4)
 
     # Optimizer
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
