@@ -2,7 +2,6 @@ import albumentations as A
 from albumentations.pytorch import ToTensorV2
 
 
-
 def get_train_transform():
     return A.Compose([
         A.RandomRotate90(p=0.1),

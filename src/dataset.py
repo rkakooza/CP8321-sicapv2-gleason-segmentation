@@ -61,13 +61,15 @@ class SICAPv2Dataset(Dataset):
             raise FileNotFoundError(f"Mask not found: {self.mask_paths[idx]}")
         mask_raw = mask_raw.astype(np.uint8)
 
-        mask_binary = (mask_raw > 50).astype(np.uint8)
+        mask_class = (mask_raw > 50).astype(np.uint8)
 
-        # Patch-level Gleason label (0–3)
-        patch_label = self.labels[idx] if self.labels is not None else 0
+        # mask_binary = (mask_raw > 50).astype(np.uint8)
 
-        # Convert binary mask to multi-class: background=0, tissue=patch_label
-        mask_class = mask_binary * patch_label
+        # # Patch-level Gleason label (0–3)
+        # patch_label = self.labels[idx] if self.labels is not None else 0
+
+        # # Convert binary mask to multi-class: background=0, tissue=patch_label
+        # mask_class = mask_binary * patch_label
      
 
 
