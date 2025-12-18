@@ -59,9 +59,9 @@ class SICAPv2Dataset(Dataset):
         mask_raw = cv2.imread(self.mask_paths[idx], cv2.IMREAD_GRAYSCALE)
         if mask_raw is None:
             raise FileNotFoundError(f"Mask not found: {self.mask_paths[idx]}")
-        mask_raw = mask_raw.astype(np.uint8)
+        mask_class = mask_raw.astype(np.uint8) 
 
-        mask_class = (mask_raw > 50).astype(np.uint8)
+        # mask_class = (mask_raw > 50).astype(np.uint8) 
 
         # mask_binary = (mask_raw > 50).astype(np.uint8)
 

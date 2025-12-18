@@ -101,7 +101,7 @@ def main():
     device = get_device()
 
     # Model
-    model = AttentionUNet(in_channels=3, num_classes=2).to(device)
+    model = AttentionUNet(in_channels=3, num_classes=4).to(device)
 
     # Loss function
     loss_fn = torch.nn.CrossEntropyLoss() # Another option i tried, produced good Values
@@ -129,7 +129,7 @@ def main():
             optimizer=optimizer,
             loss_fn=loss_fn,
             device=device,
-            num_classes=2,
+            num_classes=4,
             scheduler=scheduler,
             early_stopper=early_stopper
         )
@@ -157,7 +157,7 @@ def main():
             masks = masks.to(device)
             logits = model(images)
             preds = torch.argmax(logits, dim=1)
-            m = aggregate_metrics(preds.cpu(), masks.cpu(), num_classes=2)
+            m = aggregate_metrics(preds.cpu(), masks.cpu(), num_classes=4)
             all_metrics.append(m)
 
     final_metrics = {}
