@@ -94,7 +94,7 @@ class UpBlock(nn.Module):
         return self.double_conv(x)
 
 class AttentionUNet(nn.Module):
-    def __init__(self, in_channels=3, num_classes=4):
+    def __init__(self, in_channels=3, num_classes=2):
         super().__init__()
 
         # Encoder

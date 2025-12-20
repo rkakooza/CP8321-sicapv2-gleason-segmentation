@@ -1,14 +1,7 @@
-# SICAPv2 Gleason Grade Segmentation with Attention U-Net
+# SICAPv2 Image Segmentation with Attention U-Net
 
-This project performs 4-class pixel-level segmentation of prostate histopathology
+This project performs pixel-level segmentation of prostate histopathology
 patches (SICAPv2 dataset) using an Attention U-Net model.
-
-Segmentation classes:
-
-- **0**: Non-cancerous
-- **1**: Gleason Grade 3 (GG3)
-- **2**: Gleason Grade 4 (GG4)
-- **3**: Gleason Grade 5 (GG5)
 
 ## Repository Structure
 
